@@ -21,7 +21,8 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
-      "https://velmira-peach.vercel.app"
+      "https://velmira-peach.vercel.app",
+      "https://velmira-pqniaib1k-velmira.vercel.app"
     ]
   })
 );
