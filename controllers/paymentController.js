@@ -5,6 +5,14 @@ const Order = require("../models/orderModel");
 
 
 // ========================================
+// PRODUCTION FRONTEND URL
+// ========================================
+
+const FRONTEND_URL =
+  "https://velmira-peach.vercel.app";
+
+
+// ========================================
 // INITIALIZE PAYSTACK PAYMENT
 // ========================================
 
@@ -23,7 +31,11 @@ const initializePayment = async (req, res) => {
     // CHECK REQUIRED INFORMATION
     // ========================================
 
-    if (!email || !amount || !reference) {
+    if (
+      !email ||
+      !amount ||
+      !reference
+    ) {
 
       return res.status(400).json({
 
@@ -39,7 +51,10 @@ const initializePayment = async (req, res) => {
     // CHECK AUTHENTICATION
     // ========================================
 
-    if (!req.user || !req.user.id) {
+    if (
+      !req.user ||
+      !req.user.id
+    ) {
 
       return res.status(401).json({
 
@@ -118,67 +133,57 @@ const initializePayment = async (req, res) => {
 
 
     // ========================================
-    // CALL PAYSTACK
+    // INITIALIZE TRANSACTION
     // ========================================
 
-    console.log(
-      "ABOUT TO CALL PAYSTACK API"
-    );
+    const response =
+      await axios.post(
+
+        "https://api.paystack.co/transaction/initialize",
+
+        {
+
+          email,
+
+          amount:
+            amountInKobo,
+
+          reference,
 
 
-    const response = await axios.post(
+          // ========================================
+          // SUCCESS CALLBACK
+          // ========================================
 
-      "https://api.paystack.co/transaction/initialize",
+callback_url:
+  "https://velmira-peach.vercel.app/payment/callback",
 
-      {
+metadata: {
 
-        email,
+  cancel_action:
+    "https://velmira-peach.vercel.app/payment/callback"
 
-        amount:
-          amountInKobo,
+}
+        },
 
-        reference,
+        {
 
+          headers: {
 
-        // ========================================
-        // CALLBACK URL
-        // ========================================
+            Authorization:
+              `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
 
-        callback_url:
-          "http://localhost:5173/velmira-react/payment/callback",
+            "Content-Type":
+              "application/json"
 
+          },
 
-        // ========================================
-        // CANCEL ACTION
-        // ========================================
-
-        metadata: {
-
-          cancel_action:
-            "http://localhost:5173/velmira-react/payment/callback"
+          timeout:
+            15000
 
         }
 
-      },
-
-      {
-
-        headers: {
-
-          Authorization:
-            `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-
-          "Content-Type":
-            "application/json"
-
-        },
-
-        timeout:
-          15000
-
-      }
-
-    );
+      );
 
 
     // ========================================
@@ -197,7 +202,7 @@ const initializePayment = async (req, res) => {
 
 
     // ========================================
-    // RETURN RESPONSE TO FRONTEND
+    // RETURN RESPONSE
     // ========================================
 
     return res.status(200).json(
@@ -262,28 +267,29 @@ const verifyPayment = async (req, res) => {
     // VERIFY WITH PAYSTACK
     // ========================================
 
-    const response = await axios.get(
+    const response =
+      await axios.get(
 
-      `https://api.paystack.co/transaction/verify/${reference}`,
+        `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
 
-      {
+        {
 
-        headers: {
+          headers: {
 
-          Authorization:
-            `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+            Authorization:
+              `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
 
-          "Content-Type":
-            "application/json"
+            "Content-Type":
+              "application/json"
 
-        },
+          },
 
-        timeout:
-          15000
+          timeout:
+            15000
 
-      }
+        }
 
-    );
+      );
 
 
     // ========================================
@@ -346,6 +352,7 @@ const verifyPayment = async (req, res) => {
         "NO ORDER FOUND FOR PAYMENT:",
         reference
       );
+
 
       return res.status(404).json({
 
@@ -543,7 +550,9 @@ const paystackWebhook = async (req, res) => {
     // ========================================
 
     const signature =
-      req.headers["x-paystack-signature"];
+      req.headers[
+        "x-paystack-signature"
+      ];
 
 
     // ========================================
@@ -572,7 +581,9 @@ const paystackWebhook = async (req, res) => {
           "sha512",
           process.env.PAYSTACK_SECRET_KEY
         )
-        .update(req.rawBody)
+        .update(
+          req.rawBody || ""
+        )
         .digest("hex");
 
 
@@ -580,11 +591,15 @@ const paystackWebhook = async (req, res) => {
     // VERIFY SIGNATURE
     // ========================================
 
-    if (hash !== signature) {
+    if (
+      hash !==
+      signature
+    ) {
 
       console.log(
         "INVALID PAYSTACK WEBHOOK SIGNATURE"
       );
+
 
       return res.status(401).json({
 
@@ -649,6 +664,7 @@ const paystackWebhook = async (req, res) => {
           reference
         );
 
+
         return res.status(200).json({
 
           message:
@@ -660,7 +676,7 @@ const paystackWebhook = async (req, res) => {
 
 
       // ========================================
-      // VERIFY AMOUNT FROM WEBHOOK
+      // VERIFY WEBHOOK AMOUNT
       // ========================================
 
       const expectedAmount =
@@ -679,6 +695,7 @@ const paystackWebhook = async (req, res) => {
           reference
         );
 
+
         return res.status(400).json({
 
           message:
@@ -690,7 +707,7 @@ const paystackWebhook = async (req, res) => {
 
 
       // ========================================
-      // UPDATE PAYMENT STATUS
+      // MARK ORDER AS PAID
       // ========================================
 
       if (
