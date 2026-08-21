@@ -1,4 +1,13 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
+
+
+// ============================
+// RESEND
+// ============================
+
+const resend = new Resend(
+  process.env.RESEND_API_KEY
+);
 
 
 // ============================
@@ -39,47 +48,35 @@ const sendContactMessage = async (req, res) => {
 
 
     // ============================
-    // CREATE GMAIL TRANSPORTER
+    // CHECK RESEND API KEY
     // ============================
 
-    const transporter =
-      nodemailer.createTransport({
+    if (!process.env.RESEND_API_KEY) {
 
-        service: "gmail",
+      console.error(
+        "RESEND_API_KEY is not configured"
+      );
 
-        auth: {
+      return res.status(500).json({
 
-          user:
-            process.env.GMAIL_USER,
-
-          pass:
-            process.env.GMAIL_APP_PASSWORD
-
-        }
+        message:
+          "Email service is not configured"
 
       });
+
+    }
 
 
     // ============================
     // EMAIL CONTENT
     // ============================
 
-    const mailOptions = {
+    const emailSubject =
+      subject ||
+      "New Velmira Contact Message";
 
-      from:
-        process.env.GMAIL_USER,
 
-      to:
-        process.env.GMAIL_USER,
-
-      replyTo:
-        email,
-
-      subject:
-        subject ||
-        "New Velmira Contact Message",
-
-      text: `
+    const emailText = `
 New message from the Velmira website.
 
 Name:
@@ -96,84 +93,125 @@ ${subject || "No subject"}
 
 Message:
 ${message}
-      `,
+    `;
 
-      html: `
 
-        <div style="
-          font-family: Arial, sans-serif;
-          max-width: 700px;
-          margin: auto;
-          padding: 30px;
-          border: 1px solid #ddd;
-          border-radius: 10px;
+    const emailHtml = `
+
+      <div style="
+        font-family: Arial, sans-serif;
+        max-width: 700px;
+        margin: auto;
+        padding: 30px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        background: #ffffff;
+      ">
+
+        <h2 style="
+          margin-bottom: 25px;
+          color: #222;
         ">
-
-          <h2 style="
-            margin-bottom: 25px;
-          ">
-            New Velmira Contact Message
-          </h2>
+          New Velmira Contact Message
+        </h2>
 
 
-          <p>
-            <strong>Name:</strong>
-            ${name}
-          </p>
+        <p>
+          <strong>Name:</strong>
+          ${name}
+        </p>
 
 
-          <p>
-            <strong>Email:</strong>
-            ${email}
-          </p>
+        <p>
+          <strong>Email:</strong>
+          ${email}
+        </p>
 
 
-          <p>
-            <strong>Phone:</strong>
-            ${phone || "Not provided"}
-          </p>
+        <p>
+          <strong>Phone:</strong>
+          ${phone || "Not provided"}
+        </p>
 
 
-          <p>
-            <strong>Subject:</strong>
-            ${subject || "No subject"}
-          </p>
+        <p>
+          <strong>Subject:</strong>
+          ${subject || "No subject"}
+        </p>
 
 
-          <hr />
+        <hr />
 
 
-          <h3>
-            Message
-          </h3>
+        <h3>
+          Message
+        </h3>
 
 
-          <p style="
-            white-space: pre-line;
-            line-height: 1.6;
-          ">
-            ${message}
-          </p>
+        <p style="
+          white-space: pre-line;
+          line-height: 1.6;
+        ">
+          ${message}
+        </p>
 
 
-        </div>
+      </div>
 
-      `
-
-    };
+    `;
 
 
     // ============================
-    // SEND EMAIL
+    // SEND EMAIL WITH RESEND
     // ============================
 
-    await transporter.sendMail(
-      mailOptions
-    );
+    const { data, error } =
+      await resend.emails.send({
+
+        from:
+          "Velmira <onboarding@resend.dev>",
+
+        to:
+          ["adebayostephen1705@gmail.com"],
+
+        replyTo:
+          email,
+
+        subject:
+          emailSubject,
+
+        text:
+          emailText,
+
+        html:
+          emailHtml
+
+      });
 
 
     // ============================
-    // SUCCESS RESPONSE
+    // RESEND ERROR
+    // ============================
+
+    if (error) {
+
+      console.error(
+        "RESEND EMAIL ERROR:",
+        error
+      );
+
+      return res.status(500).json({
+
+        message:
+          "Failed to send message"
+
+      });
+
+    }
+
+
+    // ============================
+    // SUCCESS
     // ============================
 
     console.log(
@@ -181,11 +219,19 @@ ${message}
       email
     );
 
+    console.log(
+      "RESEND EMAIL ID:",
+      data?.id
+    );
 
-    res.status(200).json({
+
+    return res.status(200).json({
 
       message:
-        "Message sent successfully"
+        "Message sent successfully",
+
+      id:
+        data?.id
 
     });
 
@@ -193,12 +239,12 @@ ${message}
   } catch (error) {
 
     console.error(
-      "Contact email error:",
+      "CONTACT EMAIL ERROR:",
       error
     );
 
 
-    res.status(500).json({
+    return res.status(500).json({
 
       message:
         "Failed to send message"
@@ -210,6 +256,12 @@ ${message}
 };
 
 
+// ============================
+// EXPORT
+// ============================
+
 module.exports = {
+
   sendContactMessage
+
 };
